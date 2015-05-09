@@ -2,6 +2,9 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * 
@@ -16,6 +19,10 @@ import java.net.SocketException;
 
 
 public class NameServer {
+	
+	
+	//Store of Names and IP/Port of the registered servers
+	private static HashMap<String, ArrayList<String>> serverTable = new HashMap<String, ArrayList<String>>();
 	
 	
 	public static void main(String[] args) throws Exception {
@@ -49,15 +56,83 @@ public class NameServer {
 			//Send ACK to received packet
 			InetAddress IPAddress = receivePacket.getAddress();
 			int clientPort = receivePacket.getPort();
+			sendData = "ACK\n".getBytes();
 			DatagramPacket sendPacket = new DatagramPacket (sendData, sendData.length, IPAddress, clientPort);
 			serverSocket.send(sendPacket);
 			
+			//Clear Buffers
+			receiveData = null;
+			sendData = null;
+			
 			//Parse the sent message
+			String message = new String(receivePacket.getData());
+			
+			try {
+				switch (message.substring(0, 4)) {
+				
+				case "regi":
+					//Register Request
+					if( regQuery(message.trim()) ) {
+						//send confirm to client
+						sendData = "GOOD\n".getBytes();
+					} else {
+						sendData = "BAD\n".getBytes();
+						//Close the connection
+						serverSocket.close();
+					}
+					break;
+					
+				case "look":
+					//Lookup Request
+					if ( lookQuery(message.trim()) ) {
+						String name = message.substring(5, (message.trim().length()) ); //line.length includes \r\n in eclipse so -2
+						ArrayList<String> list = serverTable.get(name); 
+						//Return the requested name and information to client
+						sendData = (name + "," + list.get(0) + "," + list.get(1) + "\n").getBytes();
+
+					} else {
+						sendData = "Error: Process has not registered with the Name Server\n".getBytes();
+					}
+					break;
+					
+				default:
+					//Rubbish
+					sendData = "BAD\n".getBytes();
+					serverSocket.close();
+					break;
+				}				
+				
+			} catch (StringIndexOutOfBoundsException e) {
+				sendData = "BAD\n".getBytes();
+				serverSocket.close();
+				break;
+			}
+			
+			//Send the reply message to the client
+			//Simulate packet loss on send
+			if ( Math.random() >= 0.5) {
+				DatagramPacket sendPacket2 = new DatagramPacket (sendData, sendData.length, IPAddress, clientPort);
+				serverSocket.send(sendPacket2);
+			}
+			
+			//Set timeout and wait for ACK
+			serverSocket.setSoTimeout(1000);
+			try {
+				serverSocket.receive(receivePacket);
+				if ( ! receivePacket.getData().toString().equals("ACK\n")) {
+					//Received but not ACK, Re-send?
+				}
+			} catch (SocketTimeoutException e) {
+				//Re-send the packet
+				
+			}
 			
 			
 		}
-
 		
+		//Broke from loop
+		serverSocket.close();
+		System.exit(1);
 
 	}
 	
@@ -86,6 +161,28 @@ public class NameServer {
 			System.exit(1);
 		}
 		return port;
+	}
+	
+	//Check a message for correct format to register
+	private static boolean regQuery(String message) {
+		String[] data = message.split(",");
+		
+		//TODO Check if valid Name,IP,Port, correct number of items (3)
+		
+		ArrayList<String> list = new ArrayList<String>();
+		list.add(data[2]);
+		list.add(data[3]);
+		serverTable.put(data[1], list);		
+		
+		return true;
+	}
+	
+	//Check if a message is in the Table
+	private static boolean lookQuery(String message) {
+		String[] data = message.split(",");
+		
+		//TODO Check if valid name?		
+		return serverTable.containsKey(data[1]);	
 	}
 
 }
