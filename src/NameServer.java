@@ -1,11 +1,3 @@
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.util.ArrayList;
-import java.util.HashMap;
-
 /**
  * 
  * @author Sam Damen (42636678)
@@ -13,10 +5,16 @@ import java.util.HashMap;
  * COMS3200
  * Assignment 2
  *
- * Only simulate packet loss on send of data, not ACKs of said data
+ * No-packetloss simulated for NameServer
  *
  */
 
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 public class NameServer {
 	
@@ -31,8 +29,8 @@ public class NameServer {
 		int port = commandParse(args);
 		
 		//Buffers
-		byte[] receiveData = new byte[1024];
-		byte[] sendData = new byte[1024];
+//		byte[] receiveData = new byte[1024];
+//		byte[] sendData = new byte[1024];
 		
 		//Create Datagram Socket
 		DatagramSocket serverSocket = null;
@@ -48,6 +46,10 @@ public class NameServer {
 		
 		//Handle Requests
 		while(true) {
+			
+			//Buffers
+			byte[] receiveData = new byte[1024];
+			byte[] sendData = new byte[1024];
 			
 			//Block while Receive packet
 			DatagramPacket receivePacket= new DatagramPacket(receiveData, receiveData.length);
@@ -97,8 +99,7 @@ public class NameServer {
 					
 				default:
 					//Rubbish
-					sendData = "BAD\n".getBytes();
-					serverSocket.close();
+					sendData = "BAD\n".getBytes();	//Close the connection in UDP?
 					break;
 				}				
 				
@@ -109,24 +110,12 @@ public class NameServer {
 			}
 			
 			//Send the reply message to the client
-			//Simulate packet loss on send
-			if ( Math.random() >= 0.5) {
-				DatagramPacket sendPacket2 = new DatagramPacket (sendData, sendData.length, IPAddress, clientPort);
-				serverSocket.send(sendPacket2);
-			}
+			DatagramPacket sendPacket2 = new DatagramPacket (sendData, sendData.length, IPAddress, clientPort);
+			serverSocket.send(sendPacket2);
 			
-			//Set timeout and wait for ACK
-			serverSocket.setSoTimeout(1000);
-			try {
-				serverSocket.receive(receivePacket);
-				if ( ! receivePacket.getData().toString().equals("ACK\n")) {
-					//Received but not ACK, Re-send?
-				}
-			} catch (SocketTimeoutException e) {
-				//Re-send the packet
-				
-			}
-			
+			//Clear Buffers
+			receiveData = null;
+			sendData = null;
 			
 		}
 		
@@ -183,6 +172,6 @@ public class NameServer {
 		
 		//TODO Check if valid name?		
 		return serverTable.containsKey(data[1]);	
-	}
+	}	
 
 }
