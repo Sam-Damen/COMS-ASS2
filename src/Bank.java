@@ -1,8 +1,3 @@
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketTimeoutException;
-
 /**
  * 
  * @author Sam Damen (42636678)
@@ -10,11 +5,17 @@ import java.net.SocketTimeoutException;
  * COMS3200
  * Assignment 2
  * 
- * Inputs = Bank Port NS Port
+ * Inputs = BankPort NSPort
  *
  * Simulate packet loss when communicating with Nameserver
  *
  */
+
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 
 
 public class Bank {
@@ -23,14 +24,22 @@ public class Bank {
 		
 		int[] ports = commandParse(args);
 		
-		//Try to Register with the nameServer
-		registerNS(ports);
 		
 		//Start up Server functionality
-		DatagramSocket serverSocket = new DatagramSocket(ports[0]);
-
-		System.err.println("Bank waiting for incoming connections\n");
+		//Create Datagram Socket
+		DatagramSocket serverSocket = null;
+		try {
+			serverSocket = new DatagramSocket(ports[0]);
+			//Successfully can listen on port
+			System.err.print("Bank waiting for incoming connections ...\n");
+		} catch (SocketException e) {
+			System.err.format("Cannot listen on given port number %d\n", ports[0]);
+			System.exit(1);
+		}	
 		
+		//Try to Register with the nameServer
+		registerNS(ports);
+
 		while (true) {
 			
 			// set buffers
@@ -78,11 +87,11 @@ public class Bank {
 	}
 	
 	
-	//*******************************************************************
-	//
-	//						        Extra Methods
-	//
-	//*******************************************************************
+//*******************************************************************
+//
+//						        Extra Methods
+//
+//*******************************************************************
 		
 		//Perform command line parsing
 		private static int[] commandParse(String[] args) {
