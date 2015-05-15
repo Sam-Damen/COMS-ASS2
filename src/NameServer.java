@@ -4,6 +4,8 @@
  * NameServer
  * COMS3200
  * Assignment 2
+ * 
+ * Input = Port
  *
  * No-packetloss simulated for NameServer
  *
@@ -105,7 +107,7 @@ public class NameServer {
 				
 			} catch (StringIndexOutOfBoundsException e) {
 				sendData = "BAD\n".getBytes();
-				serverSocket.close();
+				e.printStackTrace();
 				break;
 			}
 			
@@ -121,6 +123,7 @@ public class NameServer {
 		
 		//Broke from loop
 		serverSocket.close();
+		System.out.println("String Parsing error");		
 		System.exit(1);
 
 	}

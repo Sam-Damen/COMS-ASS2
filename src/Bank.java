@@ -146,7 +146,7 @@ public class Bank {
 					clientSocket.receive(receivePacket);
 					//Check for ACK
 					String msg = new String (receivePacket.getData());
-					//System.out.println(msg);
+					System.out.println("Message Received");
 					if ( msg.contains("ACK") ) {
 						//Check for GOOD/BAD
 						clientSocket.receive(receivePacket);
@@ -165,7 +165,7 @@ public class Bank {
 					}
 				} catch (SocketTimeoutException e) {
 					//Did not receive the packet, re-send
-					//System.out.println("Resend");
+					System.out.println("Packet Loss Timeout");
 					//Simulate packet Loss
 					if (Math.random() >= 0.5) {
 						clientSocket.send(sendPacket);

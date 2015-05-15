@@ -38,7 +38,7 @@ public class Client {
 		
 		DatagramSocket clientSocket = new DatagramSocket();
 		InetAddress IPAddr = InetAddress.getByName(store[1]);			
-		DatagramPacket receivePacket = new DatagramPacket( receiveData,receiveData.length, IPAddr, Integer.parseInt(store[2]) );
+		DatagramPacket receivePacket = new DatagramPacket( receiveData,receiveData.length, IPAddr, Integer.parseInt(store[2].trim()) );
 		
 		
 		//Send requests to Store
@@ -48,7 +48,7 @@ public class Client {
 			sendData = Integer.toString(commands[0]).getBytes();
 		}
 
-		DatagramPacket sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,Integer.parseInt(store[2]));
+		DatagramPacket sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,Integer.parseInt(store[2].trim()));
 		
 		//Simulate Packet Loss
 		if (Math.random() >= 0.5) {
@@ -56,44 +56,50 @@ public class Client {
 		}
 		
 		//Set Timeout to 2 sec			
-		clientSocket.setSoTimeout(2000);
+		clientSocket.setSoTimeout(5000);
 		int i = 0;
 		
 		//Try to receive ACK, will continue to loop until 3 tries
 		// 3 failed sending attempts is regarded as "could not connect"
-		while (true) {
-			
-			try {
+		try {
+			while (true) {
 				clientSocket.receive(receivePacket);
 				//Check for ACK
 				String msg = new String (receivePacket.getData());
-				//System.out.println(msg);
+				System.out.println("Message Received");
 				if ( msg.contains("ACK") ) {
-					//Receive & print All data until "connection closed"					
-					String msg2 = null;
+					//Receive & print All data until "connection closed" by store
+					clientSocket.receive(receivePacket);
+					String msg2 = new String (receivePacket.getData());
 					while ( ! msg2.contains("DONE") ) {
-						
+	
 						clientSocket.receive(receivePacket);
-						msg2 = new String (receivePacket.getData());	
-						
-						System.out.println(msg2);						
-					}					
+						System.out.println(msg2);
+						msg2 = new String (receivePacket.getData()); 
+					}
+					//Finished receiving data, exit process
+					break;
 				}
+				if ( i >= 2) {
+					System.err.println("Client unable to Connect with Store");
+					clientSocket.close();
+					System.exit(1);
+				}
+				i++;
+				
+			}
+				
 			} catch (SocketTimeoutException e) {
 				//Did not receive the packet, re-send
+				System.out.println("Packet Loss Timeout");
 				//Simulate packet Loss
 				if (Math.random() >= 0.5) {
 					clientSocket.send(sendPacket);
 				} 					
 			}
-			
-			if ( i >= 2) {
-				System.err.println("Client unable to Connect with Store");
-				clientSocket.close();
-				System.exit(1);
-			}
-			i++;
-		}
+
+		clientSocket.close();
+		System.exit(1);
 	}	
 		
 		
@@ -156,7 +162,7 @@ public class Client {
 				clientSocket.receive(receivePacket);
 				//Check for ACK
 				String msg = new String (receivePacket.getData());
-				//System.out.println(msg);
+				System.out.println("Message Received");
 				if ( msg.contains("ACK") ) {
 					//Check for Error or Store Info
 					clientSocket.receive(receivePacket);
@@ -169,13 +175,11 @@ public class Client {
 						System.exit(1);
 					} else {
 						return msg2;
-					}
-					
-					
+					}					
 				}
 			} catch (SocketTimeoutException e) {
 				//Did not receive the packet, re-send
-				//System.out.println("Resend");
+				System.out.println("Packet Loss Timeout");
 				//Simulate packet Loss
 				if (Math.random() >= 0.5) {
 					clientSocket.send(sendPacket);
