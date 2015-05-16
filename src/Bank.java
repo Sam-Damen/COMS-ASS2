@@ -47,7 +47,7 @@ public class Bank {
 			byte[] sendData = new byte[1024];
 			
 			
-			// receive message from client
+			// receive message from store
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 			serverSocket.receive(receivePacket);
 			

@@ -28,6 +28,8 @@ public class Store {
 	
 	static String[] bank;
 	static String[] content;
+	//Create Datagram Socket
+	static DatagramSocket serverSocket = null;
 
 	public static void main(String[] args) throws Exception {
 
@@ -77,8 +79,6 @@ public class Store {
 		}
 		
 		//Perform Server functionality
-		//Create Datagram Socket
-		DatagramSocket serverSocket = null;
 		try {
 			serverSocket = new DatagramSocket(commands[0]);
 			//Successfully can listen on port
@@ -108,9 +108,8 @@ public class Store {
 			
 			
 			//Handle the client requests
-			int request = Integer.parseInt( new String(receivePacket.getData()).trim() );
+			int request = Integer.parseInt( new String(receivePacket.getData()).substring(0, 1) );
 			if (request == 0) {
-				System.out.println("Got request");
 				int i = 0;
 				//Iterate over all entries in the stock map
 				for (Entry<Long,Float> entry : stock.entrySet() ) {
@@ -127,14 +126,84 @@ public class Store {
 				
 			} else {
 				//Purchase Request
-				
-			}
-			
-			
-		}
-		
-		
+				System.out.println("pur req");
+				Long id = (long) stock.keySet().toArray()[request - 1];
+				sendData = Long.toString(id).getBytes();
+				InetAddress bankAddr = InetAddress.getByName(bank[1]);
+				sendPacket = new DatagramPacket(sendData,sendData.length,bankAddr,Integer.parseInt(bank[2].trim()) );
+								
+				//Send id to Bank
+				//Simulate Packet Loss
+				if (Math.random() >= 0.5) {
+					serverSocket.send(sendPacket);
+				}
+				int i = 0;
 
+				while (true) {					
+					try {
+						serverSocket.receive(receivePacket);
+						//Check for ACK
+						String msg = new String (receivePacket.getData());
+						if ( msg.contains("ACK") ) {
+							//Check bank response
+							serverSocket.receive(receivePacket);
+							String msg2 = new String (receivePacket.getData());
+							//Successful registration
+							if (msg2.contains("1")) {
+								//Get item from content server
+								String contentReply = getContent(Long.toString(id));
+								if( contentReply.contains("aborted") ) {
+									//Failed to purchase (Content)
+									sendData = (Long.toString(id) + " transaction aborted").getBytes();
+									sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,clientPort);
+									serverSocket.send(sendPacket);
+									sendData = null;
+									sendData = "DONE".getBytes();
+									sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,clientPort);
+									serverSocket.send(sendPacket);
+									serverSocket.close();
+								} else {
+									//Successful Purchase
+									sendData = contentReply.getBytes();
+									sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,clientPort);
+									serverSocket.send(sendPacket);
+									sendData = null;
+									sendData = "DONE".getBytes();
+									sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,clientPort);
+									serverSocket.send(sendPacket);
+									serverSocket.close();
+								}
+								break;
+							} else {
+								//Failed to purchase (Bank)
+								sendData = (Long.toString(id) + " transaction aborted").getBytes();
+								sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,clientPort);
+								serverSocket.send(sendPacket);
+								sendData = null;
+								sendData = "DONE".getBytes();
+								sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,clientPort);
+								serverSocket.send(sendPacket);
+								serverSocket.close();
+								break;
+							}							
+						}
+					} catch (SocketTimeoutException e) {
+						//Did not receive the packet, re-send
+						System.out.println("Packet Loss Timeout");
+						//Simulate packet Loss
+						if (Math.random() >= 0.5) {
+							serverSocket.send(sendPacket);
+						} 					
+					}
+					
+					if ( i >= 2) {
+						System.err.println("Store unable to communicate with Bank");
+						break;
+					}
+					i++;
+				}
+			}			
+		}
 	}
 	
 	
@@ -232,6 +301,7 @@ public class Store {
 		clientSocket.close();
 	}
 	
+	
 	//Client Instance to get Bank & Content information from NS
 	static void lookupServers(int port) throws Exception {
 	
@@ -314,9 +384,65 @@ public class Store {
 			}
 			i++;
 		}
-		clientSocket.close();
+		clientSocket.close();		
+	}
+	
+	//Get a response from the Content server	
+	private static String getContent(String id) throws Exception {
 		
+		//Reply message
+		String reply = null;
+		int i = 0;
 		
+		// set buffers
+		byte[] receiveData = new byte[1024];
+		byte[] sendData = new byte[1024];
+		
+		InetAddress IPAddr = InetAddress.getByName(content[1]);
+		int port = Integer.parseInt(content[2].trim());
+		DatagramPacket receivePacket = new DatagramPacket(receiveData,receiveData.length, IPAddr, port);
+		
+		//Send ID to the content server
+		sendData = id.getBytes();
+		DatagramPacket sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,port);
+		
+		//Simulate packet Loss
+		if (Math.random() >= 0.5) {
+			serverSocket.send(sendPacket);
+		}
+		
+		while (true) {					
+			try {
+				serverSocket.receive(receivePacket);
+				//Check for ACK
+				String msg = new String (receivePacket.getData());
+				if ( msg.contains("ACK") ) {
+					//Check content response
+					serverSocket.receive(receivePacket);
+					String msg2 = new String (receivePacket.getData());
+					if (! msg2.contains("BAD") ) {
+						reply = id + " transaction aborted";
+					} else {
+						reply = msg2;
+					}
+					break;
+				}
+			} catch (SocketTimeoutException e) {
+				//Did not receive the packet, re-send
+				System.out.println("Packet Loss Timeout");
+				//Simulate packet Loss
+				if (Math.random() >= 0.5) {
+					serverSocket.send(sendPacket);
+				} 
+			}
+			if ( i >= 2) {
+				System.err.println("Store unable to connect with Content");
+				reply = id + " transaction aborted";
+				break;
+			}
+			i++;			
+		}	
+		return reply;
 	}
 	
 

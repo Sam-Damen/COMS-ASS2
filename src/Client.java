@@ -49,13 +49,14 @@ public class Client {
 		}
 
 		DatagramPacket sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,Integer.parseInt(store[2].trim()));
+
 		
 		//Simulate Packet Loss
 		if (Math.random() >= 0.5) {
 			clientSocket.send(sendPacket);
 		}
 		
-		//Set Timeout to 2 sec			
+		//Set Timeout to 5 sec			
 		clientSocket.setSoTimeout(5000);
 		int i = 0;
 		
@@ -71,6 +72,7 @@ public class Client {
 					//Receive & print All data until "connection closed" by store
 					clientSocket.receive(receivePacket);
 					String msg2 = new String (receivePacket.getData());
+					System.out.println("here");
 					while ( ! msg2.contains("DONE") ) {
 	
 						clientSocket.receive(receivePacket);
@@ -85,8 +87,7 @@ public class Client {
 					clientSocket.close();
 					System.exit(1);
 				}
-				i++;
-				
+				i++;				
 			}
 				
 			} catch (SocketTimeoutException e) {
@@ -98,8 +99,8 @@ public class Client {
 				} 					
 			}
 
-		clientSocket.close();
-		System.exit(1);
+//		clientSocket.close();
+//		System.exit(1);
 	}	
 		
 		
@@ -123,7 +124,7 @@ public class Client {
 				System.exit(1);
 			}			
 		} else {
-			System.err.print("Invalid command line arguments\n");
+			System.err.println("Invalid command line arguments");
 			System.exit(1);
 		}
 		return ports;
