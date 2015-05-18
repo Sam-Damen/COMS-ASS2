@@ -94,6 +94,8 @@ public class Store {
 			byte[] receiveData = new byte[1024];
 			byte[] sendData = new byte[1024];
 			
+			//Set timeout to block forever while waiting for new client
+			serverSocket.setSoTimeout(0);
 			
 			// receive message from Client
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
@@ -126,7 +128,6 @@ public class Store {
 				
 			} else {
 				//Purchase Request
-				System.out.println("pur req");
 				Long id = (long) stock.keySet().toArray()[request - 1];
 				sendData = Long.toString(id).getBytes();
 				InetAddress bankAddr = InetAddress.getByName(bank[1]);
@@ -138,18 +139,22 @@ public class Store {
 					serverSocket.send(sendPacket);
 				}
 				int i = 0;
+				
+				//Set Timeout to 1 sec			
+				serverSocket.setSoTimeout(1000);
 
 				while (true) {					
 					try {
+						//Get response from Bank
 						serverSocket.receive(receivePacket);
 						//Check for ACK
 						String msg = new String (receivePacket.getData());
 						if ( msg.contains("ACK") ) {
 							//Check bank response
 							serverSocket.receive(receivePacket);
-							String msg2 = new String (receivePacket.getData());
+							String msg2 = new String (receivePacket.getData()).substring(0,1);
 							//Successful registration
-							if (msg2.contains("1")) {
+							if (msg2.equals("1")) {
 								//Get item from content server
 								String contentReply = getContent(Long.toString(id));
 								if( contentReply.contains("aborted") ) {
@@ -161,7 +166,6 @@ public class Store {
 									sendData = "DONE".getBytes();
 									sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,clientPort);
 									serverSocket.send(sendPacket);
-									serverSocket.close();
 								} else {
 									//Successful Purchase
 									sendData = contentReply.getBytes();
@@ -171,8 +175,8 @@ public class Store {
 									sendData = "DONE".getBytes();
 									sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,clientPort);
 									serverSocket.send(sendPacket);
-									serverSocket.close();
 								}
+								i=0;
 								break;
 							} else {
 								//Failed to purchase (Bank)
@@ -183,7 +187,7 @@ public class Store {
 								sendData = "DONE".getBytes();
 								sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,clientPort);
 								serverSocket.send(sendPacket);
-								serverSocket.close();
+								i=0;
 								break;
 							}							
 						}
@@ -196,8 +200,13 @@ public class Store {
 						} 					
 					}
 					
-					if ( i >= 2) {
+					if ( i >= 5) {
 						System.err.println("Store unable to communicate with Bank");
+						//Close the 'connection' with the client
+						sendData = null;
+						sendData = "DONE".getBytes();
+						sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,clientPort);
+						serverSocket.send(sendPacket);
 						break;
 					}
 					i++;
@@ -254,8 +263,8 @@ public class Store {
 			clientSocket.send(sendPacket);
 		}
 		
-		//Set Timeout to 2 sec			
-		clientSocket.setSoTimeout(5000);
+		//Set Timeout to 1 sec			
+		clientSocket.setSoTimeout(1000);
 		int i = 0;
 		
 		//Try to receive ACK, will continue to loop until 3 tries
@@ -291,7 +300,7 @@ public class Store {
 				} 					
 			}
 			
-			if ( i >= 2) {
+			if ( i >= 5) {
 				System.err.println("Store registration to NameServer failed");
 				clientSocket.close();
 				System.exit(1);
@@ -322,8 +331,8 @@ public class Store {
 			clientSocket.send(sendPacket);
 		}
 		
-		//Set Timeout to 2 sec			
-		clientSocket.setSoTimeout(5000);
+		//Set Timeout to 1 sec			
+		clientSocket.setSoTimeout(1000);
 		int i =0;
 		
 		//Try to receive ACK, will continue to loop until 3 tries
@@ -343,7 +352,7 @@ public class Store {
 					
 					//Successful registration
 					if (! bank[0].equals("Bank")) {
-						System.out.print("Bank has not registered\n");
+						System.err.print("Bank has not registered\n");
 						System.exit(1);
 					} 
 					
@@ -361,7 +370,7 @@ public class Store {
 						content = new String (receivePacket.getData()).split(",");
 						
 						if (! content[0].equals("Content")) {
-							System.out.print("Content has not registered\n");
+							System.err.print("Content has not registered\n");
 							System.exit(1);
 						} 
 					}
@@ -377,7 +386,7 @@ public class Store {
 				} 					
 			}
 			
-			if ( i >= 2) {
+			if ( i >= 5) {
 				System.err.println("Store unable to communicate with NameServer");
 				clientSocket.close();
 				System.exit(1);
@@ -420,7 +429,7 @@ public class Store {
 					//Check content response
 					serverSocket.receive(receivePacket);
 					String msg2 = new String (receivePacket.getData());
-					if (! msg2.contains("BAD") ) {
+					if ( msg2.contains("BAD") ) {
 						reply = id + " transaction aborted";
 					} else {
 						reply = msg2;
@@ -435,8 +444,8 @@ public class Store {
 					serverSocket.send(sendPacket);
 				} 
 			}
-			if ( i >= 2) {
-				System.err.println("Store unable to connect with Content");
+			if ( i >= 5) {
+				System.err.println("Store unable to communicate with Content");
 				reply = id + " transaction aborted";
 				break;
 			}

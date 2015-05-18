@@ -56,23 +56,23 @@ public class Client {
 			clientSocket.send(sendPacket);
 		}
 		
-		//Set Timeout to 5 sec			
-		clientSocket.setSoTimeout(5000);
+		//Set Timeout to 1 sec			
+		clientSocket.setSoTimeout(1000);
 		int i = 0;
 		
 		//Try to receive ACK, will continue to loop until 3 tries
 		// 3 failed sending attempts is regarded as "could not connect"
-		try {
-			while (true) {
+		while(true) {
+			try {
 				clientSocket.receive(receivePacket);
 				//Check for ACK
 				String msg = new String (receivePacket.getData());
 				System.out.println("Message Received");
 				if ( msg.contains("ACK") ) {
 					//Receive & print All data until "connection closed" by store
+					clientSocket.setSoTimeout(0);
 					clientSocket.receive(receivePacket);
 					String msg2 = new String (receivePacket.getData());
-					System.out.println("here");
 					while ( ! msg2.contains("DONE") ) {
 	
 						clientSocket.receive(receivePacket);
@@ -81,15 +81,7 @@ public class Client {
 					}
 					//Finished receiving data, exit process
 					break;
-				}
-				if ( i >= 2) {
-					System.err.println("Client unable to Connect with Store");
-					clientSocket.close();
-					System.exit(1);
-				}
-				i++;				
-			}
-				
+				}				
 			} catch (SocketTimeoutException e) {
 				//Did not receive the packet, re-send
 				System.out.println("Packet Loss Timeout");
@@ -98,6 +90,14 @@ public class Client {
 					clientSocket.send(sendPacket);
 				} 					
 			}
+		
+			if ( i >= 5) {
+				System.err.println("Client unable to communicate with Store");
+				clientSocket.close();
+				System.exit(1);
+			}
+			i++;		
+		}
 
 //		clientSocket.close();
 //		System.exit(1);
@@ -151,8 +151,8 @@ public class Client {
 			clientSocket.send(sendPacket);
 		}
 		
-		//Set Timeout to 2 sec			
-		clientSocket.setSoTimeout(2000);
+		//Set Timeout to 1 sec			
+		clientSocket.setSoTimeout(1000);
 		int i = 0;
 		
 		//Try to receive ACK, will continue to loop until 3 tries
@@ -187,7 +187,7 @@ public class Client {
 				} 					
 			}
 			
-			if ( i >= 2) {
+			if ( i >= 5) {
 				System.err.println("Client unable to connect with NameServer");
 				clientSocket.close();
 				System.exit(1);

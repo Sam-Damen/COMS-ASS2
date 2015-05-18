@@ -24,7 +24,9 @@ public class Bank {
 		
 		int[] ports = commandParse(args);
 		
-		
+		//Try to Register with the nameServer
+		registerNS(ports);
+	
 		//Start up Server functionality
 		//Create Datagram Socket
 		DatagramSocket serverSocket = null;
@@ -37,8 +39,6 @@ public class Bank {
 			System.exit(1);
 		}	
 		
-		//Try to Register with the nameServer
-		registerNS(ports);
 
 		while (true) {
 			
@@ -67,7 +67,7 @@ public class Bank {
 			try {
 				long num = Long.parseLong(id);
 				
-				if ( (num & 1) == 0) {
+				if ( ! ((num & 1) == 0) ) {
 					sendData = "1\n".getBytes();
 					System.out.format("%d OK\n", num);
 				} else {
@@ -93,120 +93,92 @@ public class Bank {
 //
 //*******************************************************************
 		
-		//Perform command line parsing
-		private static int[] commandParse(String[] args) {
-			
-			int[] ports = new int[2];
-			
-			if(args.length == 2) {
-				try {
-					ports[0] = Integer.parseInt(args[0]);
-					ports[1] = Integer.parseInt(args[1]);
-				} catch (NumberFormatException e) {
-					System.err.print("Invalid command line arguments for Bank\n");
-					System.exit(1);
-				}			
-			} else {
+	//Perform command line parsing
+	private static int[] commandParse(String[] args) {
+		
+		int[] ports = new int[2];
+		
+		if(args.length == 2) {
+			try {
+				ports[0] = Integer.parseInt(args[0]);
+				ports[1] = Integer.parseInt(args[1]);
+			} catch (NumberFormatException e) {
 				System.err.print("Invalid command line arguments for Bank\n");
 				System.exit(1);
-			}
-			return ports;
+			}			
+		} else {
+			System.err.print("Invalid command line arguments for Bank\n");
+			System.exit(1);
+		}
+		return ports;
+	}
+		
+		
+	//Client instance to register with the NS
+	private static void registerNS(int[] ports) throws Exception{
+		
+		//buffers
+		byte[] sendData = new byte[1024];
+		byte[] receiveData = new byte[1024];
+		
+		DatagramSocket clientSocket = new DatagramSocket();
+		InetAddress IPAddr = InetAddress.getByName("127.0.0.1");			
+		DatagramPacket receivePacket = new DatagramPacket(receiveData,receiveData.length, IPAddr, ports[1]);
+		
+		//Send registration to server
+		sendData = ("regi,Bank,127.0.0.1," + ports[0]).getBytes();
+		DatagramPacket sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,ports[1]);
+		
+		//Simulate packet Loss
+		if (Math.random() >= 0.5) {
+			clientSocket.send(sendPacket);
 		}
 		
+		//Set Timeout to 1 sec			
+		clientSocket.setSoTimeout(1000);
+		int i =0;
 		
-		//Client instance to register with the NS
-		private static void registerNS(int[] ports) throws Exception{
+		//Try to receive ACK, will continue to loop until 3 tries
+		// 3 failed sending attempts is regarded as "could not connect"
+		while (true) {
 			
-			//buffers
-			byte[] sendData = new byte[1024];
-			byte[] receiveData = new byte[1024];
-			
-			DatagramSocket clientSocket = new DatagramSocket();
-			InetAddress IPAddr = InetAddress.getByName("127.0.0.1");			
-			DatagramPacket receivePacket = new DatagramPacket(receiveData,receiveData.length, IPAddr, ports[1]);
-			
-			//Send registration to server
-			sendData = ("regi,Bank,127.0.0.1," + ports[0]).getBytes();
-			DatagramPacket sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,ports[1]);
-			
-			//Simulate packet Loss
-			if (Math.random() >= 0.5) {
-				clientSocket.send(sendPacket);
-			}
-			
-			//Set Timeout to 2 sec			
-			clientSocket.setSoTimeout(2000);
-			int i =0;
-			
-			//Try to receive ACK, will continue to loop until 3 tries
-			// 3 failed sending attempts is regarded as "could not connect"
-			while (true) {
-				
-				try {
+			try {
+				clientSocket.receive(receivePacket);
+				//Check for ACK
+				String msg = new String (receivePacket.getData());
+				System.out.println("Message Received");
+				if ( msg.contains("ACK") ) {
+					//Check for GOOD/BAD
 					clientSocket.receive(receivePacket);
-					//Check for ACK
-					String msg = new String (receivePacket.getData());
-					System.out.println("Message Received");
-					if ( msg.contains("ACK") ) {
-						//Check for GOOD/BAD
-						clientSocket.receive(receivePacket);
-						String msg2 = new String (receivePacket.getData());
-						//Successful registration
-						if (msg2.contains("GOOD")) {
-							break;
-						} else {
-							//Failed registration
-							System.err.println("Bank registration to NameServer failed");
-							clientSocket.close();
-							System.exit(1);
-						}
-						
-						
+					String msg2 = new String (receivePacket.getData());
+					//Successful registration
+					if (msg2.contains("GOOD")) {
+						break;
+					} else {
+						//Failed registration
+						System.err.println("Bank registration to NameServer failed");
+						clientSocket.close();
+						System.exit(1);
 					}
-				} catch (SocketTimeoutException e) {
-					//Did not receive the packet, re-send
-					System.out.println("Packet Loss Timeout");
-					//Simulate packet Loss
-					if (Math.random() >= 0.5) {
-						clientSocket.send(sendPacket);
-					} 					
+					
+					
 				}
-				
-				if ( i >= 2) {
-					System.err.println("Bank registration to NameServer failed");
-					clientSocket.close();
-					System.exit(1);
-				}
-				i++;
-			}
-			clientSocket.close();
-		}		
-		
-		
-		/*
-		ReSendPacket rs = new ReSendPacket(sendData);
-		new Thread(rs).start();
-		*/
-/*		
-		//Thread to re-send packets		
-		static class ReSendPacket implements Runnable {
-			
-			private byte[] sendData;
-			
-			public ReSendPacket(byte[] data) {
-				this.sendData = data;
-			}
-			
-			public void run() {
-				
-				//DatagramPacket sendPacket = new DatagramPacket(sendData,sendData.length,IPAddr,ports[1]);
-				
+			} catch (SocketTimeoutException e) {
+				//Did not receive the packet, re-send
+				System.out.println("Packet Loss Timeout");
 				//Simulate packet Loss
 				if (Math.random() >= 0.5) {
-					//clientSocket.send(sendPacket);
-				}
+					clientSocket.send(sendPacket);
+				} 					
 			}
+			
+			if ( i >= 5) {
+				System.err.println("Bank registration to NameServer failed");
+				clientSocket.close();
+				System.exit(1);
+			}
+			i++;
 		}
-*/
-
+		clientSocket.close();
+	}		
 }

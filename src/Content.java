@@ -55,6 +55,10 @@ public class Content {
 			System.exit(1);
 		}		
 		
+		
+		//Try to register with NameServer
+		registerNS(ports);
+		
 		//Start server functions
 		//Create Datagram Socket
 		DatagramSocket serverSocket = null;
@@ -67,9 +71,7 @@ public class Content {
 			System.exit(1);
 		}	
 		
-		
-		//Try to register with NameServer
-		registerNS(ports);
+
 		
 		while (true) {
 			
@@ -157,8 +159,8 @@ public class Content {
 			clientSocket.send(sendPacket);
 		}
 		
-		//Set Timeout to 2 sec			
-		clientSocket.setSoTimeout(2000);
+		//Set Timeout to 1 sec			
+		clientSocket.setSoTimeout(1000);
 		int i =0;
 		
 		//Try to receive ACK, will continue to loop until 3 tries
@@ -195,7 +197,7 @@ public class Content {
 				} 					
 			}
 			
-			if ( i >= 2) {
+			if ( i >= 5) {
 				System.err.println("Content registration to NameServer failed");
 				clientSocket.close();
 				System.exit(1);
